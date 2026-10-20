@@ -4,6 +4,7 @@ import os
 import psycopg
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # Load environment variables from the .env file
@@ -12,7 +13,19 @@ load_dotenv()
 app = FastAPI(
     title="Task Manager API",
     description="A simple REST API to manage tasks using PostgreSQL",
-    version="1.0.0"
+    version="1.0.0",
+)
+
+# Allow requests from the local React development server
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # PostgreSQL database configuration
@@ -21,7 +34,7 @@ DB_CONFIG = {
     "user": "postgres",
     "password": os.getenv("DB_PASSWORD"),
     "host": "localhost",
-    "port": 5432
+    "port": 5432,
 }
 
 
@@ -66,20 +79,20 @@ def get_task(task_id: int):
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, title, completed FROM tasks WHERE id = %s",
-                (task_id,)
+                (task_id,),
             )
             row = cur.fetchone()
 
     if row is None:
         raise HTTPException(
             status_code=404,
-            detail="Task not found"
+            detail="Task not found",
         )
 
     return {
         "id": row[0],
         "title": row[1],
-        "completed": row[2]
+        "completed": row[2],
     }
 
 
@@ -87,7 +100,7 @@ def get_task(task_id: int):
 @app.post(
     "/tasks",
     response_model=TaskResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
 )
 def create_task(task: TaskCreate):
     title = task.title.strip()
@@ -95,7 +108,7 @@ def create_task(task: TaskCreate):
     if not title:
         raise HTTPException(
             status_code=422,
-            detail="Task title cannot be empty"
+            detail="Task title cannot be empty",
         )
 
     with psycopg.connect(**DB_CONFIG) as conn:
@@ -106,14 +119,14 @@ def create_task(task: TaskCreate):
                 VALUES (%s, FALSE)
                 RETURNING id, title, completed
                 """,
-                (title,)
+                (title,),
             )
             row = cur.fetchone()
 
     return {
         "id": row[0],
         "title": row[1],
-        "completed": row[2]
+        "completed": row[2],
     }
 
 
@@ -125,7 +138,7 @@ def update_task(task_id: int, task: TaskUpdate):
     if not title:
         raise HTTPException(
             status_code=422,
-            detail="Task title cannot be empty"
+            detail="Task title cannot be empty",
         )
 
     with psycopg.connect(**DB_CONFIG) as conn:
@@ -137,41 +150,41 @@ def update_task(task_id: int, task: TaskUpdate):
                 WHERE id = %s
                 RETURNING id, title, completed
                 """,
-                (title, task.completed, task_id)
+                (title, task.completed, task_id),
             )
             row = cur.fetchone()
 
     if row is None:
         raise HTTPException(
             status_code=404,
-            detail="Task not found"
+            detail="Task not found",
         )
 
     return {
         "id": row[0],
         "title": row[1],
-        "completed": row[2]
+        "completed": row[2],
     }
 
 
 # Delete a task
 @app.delete(
     "/tasks/{task_id}",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_204_NO_CONTENT,
 )
 def delete_task(task_id: int):
     with psycopg.connect(**DB_CONFIG) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "DELETE FROM tasks WHERE id = %s RETURNING id",
-                (task_id,)
+                (task_id,),
             )
             row = cur.fetchone()
 
     if row is None:
         raise HTTPException(
             status_code=404,
-            detail="Task not found"
+            detail="Task not found",
         )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
